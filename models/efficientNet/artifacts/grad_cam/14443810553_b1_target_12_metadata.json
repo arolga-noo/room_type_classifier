@@ -1,0 +1,14 @@
+{
+  "image": "/Users/karimovdmitry/projects/mephi/room_type_classifier/data/raw/val_images/14443810553.jpg",
+  "checkpoint": "/Users/karimovdmitry/projects/mephi/room_type_classifier/models/efficientNet/artifacts/efficientnet_b1_best.pt",
+  "variant": "b1",
+  "image_size": 240,
+  "true_class": 12,
+  "true_label": "балкон / лоджия",
+  "predicted_class": 12,
+  "predicted_label": "балкон / лоджия",
+  "predicted_probability": 0.9985747337341309,
+  "target_class": 12,
+  "target_label": "балкон / лоджия",
+  "output": "/Users/karimovdmitry/projects/mephi/room_type_classifier/models/efficientNet/artifacts/grad_cam/14443810553_b1_target_12_grad_cam.jpg"
+}
