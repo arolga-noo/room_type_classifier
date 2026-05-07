@@ -25,6 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.dataloaders import create_dataloaders
 from src.metrics import calculate_macro_f1
+from src.device import get_default_device
 
 # настройки
 # - пути к данным
@@ -47,7 +48,7 @@ LEARNING_RATE = 1e-4      # Хороший старт для fine-tuning ResNet5
 RANDOM_SEED = 42
 MODEL_SAVE_PATH = PROJECT_ROOT/Path("./outputs/models/best_resnet50_avito.pth").resolve()
 
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+DEVICE = get_default_device()
 print(DEVICE)
 
 
@@ -62,10 +63,10 @@ def set_seed(seed=42):
 # загрузка и разбиение
 def load_dataset():
     train_loader, val_loader = create_dataloaders(
-        train_csv_path=CSV_PATH,
-        val_csv_path=CSV_PATH_VAL,
-        train_image_root=IMAGES_DIR,
-        val_image_root=VAL_DIR,
+        train_csv_path=None,
+        val_csv_path=None,
+        train_image_root=None,
+        val_image_root=None,
         batch_size=BATCH_SIZE,
         num_workers=NUM_WORKERS,
         image_size=224,
@@ -128,6 +129,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
 # - val_acc
 # - val_f1_macro
 # - сохраняем все y_true и y_pred для отчёта
+@torch.inference_mode()
 def validate(model, loader, criterion, device):
     model.eval()
 
@@ -224,6 +226,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
 
 def main():
     set_seed(RANDOM_SEED)
+    MODEL_SAVE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     print(CSV_PATH)
     print(IMAGES_DIR)
