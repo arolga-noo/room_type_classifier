@@ -63,7 +63,7 @@ resnet50 = [
   "torchvision==0.20.1",
 ]
 
-convnext = [
+convnext_nano = [
     "numpy==2.4.3",
     "pandas==2.3.3",
     "pillow==12.1.1",
