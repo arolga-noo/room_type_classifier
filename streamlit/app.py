@@ -11,7 +11,6 @@ from typing import Callable
 
 import torch.nn as nn
 from torchvision import transforms, models
-from torchvision.models import ResNet50_Weights
 from torchvision.transforms import v2
 
 import pandas as pd
@@ -228,8 +227,7 @@ def efficientnet_predict(image_bytes: bytes, checkpoint_path: Path) -> tuple[str
 
 
 def build_resnet50_model(num_classes):
-    weights = ResNet50_Weights.DEFAULT
-    model = models.resnet50(weights=weights)
+    model = models.resnet50(weights=None)
 
     in_features = model.fc.in_features
     model.fc = nn.Linear(in_features, num_classes)
@@ -330,7 +328,7 @@ def load_resnet18_model(checkpoint_path: str) -> tuple[object, object, int] | No
         num_classes = state_dict["fc.weight"].shape[0]
         image_size = 224
 
-    model = build_resnet18(num_classes,True,)
+    model = build_resnet18(num_classes, pretrained=False)
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
@@ -416,7 +414,7 @@ def load_convnext_nano_model(checkpoint_path: str) -> tuple[object, object, int]
 
     model = timm.create_model(
         'convnext_nano',
-        pretrained=True,
+        pretrained=False,
         num_classes=num_classes,
         drop_rate=0.5,
         drop_path_rate=0.3)
