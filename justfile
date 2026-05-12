@@ -114,11 +114,6 @@ train-densenet121 EPOCHS="30":
 train-convnext EPOCHS="30":
     uv run --group data python -m models.convnext_nano.train_convnext --epochs {{EPOCHS}}
 
-
-# Повторить лучший зафиксированный запуск ResNet18: class weights + без weighted sampler
-train-resnet18-best EPOCHS="30" SEED="42":
-    uv run --group resnet18 python models/resnet18/train_resnet18.py --epochs {{EPOCHS}} --seed {{SEED}} --no-weighted-sampling
-
 # Построить Grad-CAM для EfficientNet
 grad-cam-efficientnet:
     uv run --group efficientnet --group interpretability python models/efficientNet/grad_cam.py
@@ -142,28 +137,61 @@ docker-build:
 
 # Проверить что GPU виден внутри контейнера
 docker-check-gpu:
-    docker run --rm --gpus all room_type_classifier         python -c "import torch; print('CUDA:', torch.cuda.is_available()); print('Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+    docker run --rm --gpus all room_type_classifier \
+        python -c "import torch; print('CUDA:', torch.cuda.is_available()); print('Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
 
 # Запустить обучение DenseNet121 в Docker
 docker-train-densenet121 EPOCHS="30" BATCH="32":
-    docker run --gpus all       -v ./data:/app/data       -v ./outputs:/app/outputs       -v ./reports:/app/reports       room_type_classifier       python -m models.densenet121.train_densenet121         --epochs {{EPOCHS}} --batch-size {{BATCH}}
+    docker run --gpus all \
+      -v ./data:/app/data \
+      -v ./outputs:/app/outputs \
+      -v ./reports:/app/reports \
+      room_type_classifier \
+      python -m models.densenet121.train_densenet121 \
+        --epochs {{EPOCHS}} --batch-size {{BATCH}}
 
 # Запустить обучение ResNet18 в Docker
 docker-train-resnet18 EPOCHS="30" BATCH="32":
-    docker run --gpus all       -v ./data:/app/data       -v ./outputs:/app/outputs       -v ./reports:/app/reports       room_type_classifier       python -m models.resnet18.train_resnet18         --epochs {{EPOCHS}} --batch-size {{BATCH}}
+    docker run --gpus all \
+      -v ./data:/app/data \
+      -v ./outputs:/app/outputs \
+      -v ./reports:/app/reports \
+      room_type_classifier \
+      python -m models.resnet18.train_resnet18 \
+        --epochs {{EPOCHS}} --batch-size {{BATCH}}
 
 # Запустить обучение ResNet50 в Docker
 docker-train-resnet50 EPOCHS="30" BATCH="32":
-    docker run --gpus all       -v ./data:/app/data       -v ./outputs:/app/outputs       -v ./reports:/app/reports       room_type_classifier       python models/resnet50/resnet50.py
+    docker run --gpus all \
+      -v ./data:/app/data \
+      -v ./outputs:/app/outputs \
+      -v ./reports:/app/reports \
+      room_type_classifier \
+      python models/resnet50/resnet50.py
 
 # Запустить обучение EfficientNet в Docker
 docker-train-efficientnet EPOCHS="30" BATCH="32":
-    docker run --gpus all       -v ./data:/app/data       -v ./outputs:/app/outputs       -v ./reports:/app/reports       room_type_classifier       python -m models.efficientNet.train_efficientnet
+    docker run --gpus all \
+      -v ./data:/app/data \
+      -v ./outputs:/app/outputs \
+      -v ./reports:/app/reports \
+      room_type_classifier \
+      python -m models.efficientNet.train_efficientnet
 
 # Запустить обучение ConvNeXt Nano в Docker
 docker-train-convnext EPOCHS="30" BATCH="32":
-    docker run --gpus all       -v ./data:/app/data       -v ./outputs:/app/outputs       -v ./reports:/app/reports       room_type_classifier       python -m models.convnext_nano.train_convnext         --epochs {{EPOCHS}} --batch-size {{BATCH}}
+    docker run --gpus all \
+      -v ./data:/app/data \
+      -v ./outputs:/app/outputs \
+      -v ./reports:/app/reports \
+      room_type_classifier \
+      python -m models.convnext_nano.train_convnext \
+        --epochs {{EPOCHS}} --batch-size {{BATCH}}
 
 # Запустить YOLO inference в Docker
 docker-run-yolo:
-    docker run --gpus all       -v ./data:/app/data       -v ./models/yolo:/app/models/yolo       room_type_classifier       python models/yolo/main_yolo.py
+    docker run --gpus all \
+      -v ./data:/app/data \
+      -v ./models/yolo:/app/models/yolo \
+      room_type_classifier \
+      python models/yolo/main_yolo.py
