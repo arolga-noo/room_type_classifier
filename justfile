@@ -105,7 +105,7 @@ pytorch-cu130:
 
 # Запустить YOLO demo/inference
 run-yolo:
-    uv run --group yolo python models/yolo/main_yolo.py
+    uv run --group yolo python -m models.yolo.main_yolo
 
 # Локальное обучение
 
@@ -168,6 +168,14 @@ run *ARGS:
 # Собрать Docker-образы
 docker-build:
     docker compose build
+
+# Собрать Docker-образ Streamlit
+docker-build-streamlit:
+    docker build -f streamlit/Dockerfile -t room-type-classifier-streamlit .
+
+# Запустить Streamlit в Docker
+docker-run-streamlit:
+    docker run --rm -p 8501:8501 room-type-classifier-streamlit
 
 # Проверить доступность GPU внутри Docker
 docker-check-gpu:

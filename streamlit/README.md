@@ -5,20 +5,20 @@
 ## Локальный запуск
 
 ```bash
-uv sync --group streamlit --group yolo --group efficientnet --group resnet18 --group resnet50 --group densenet121 --group convnext_nano --group convnext_tiny
-uv run --group streamlit --group yolo --group efficientnet --group resnet18 --group resnet50 --group densenet121 --group convnext_nano --group convnext_tiny streamlit run streamlit/app.py
+just install-streamlit
+just run-streamlit
 ```
 
 ## Docker
 
-Dockerfile рассчитан на сборку из корня репозитория (в дальнейшем будет частью docker compose):
+Dockerfile рассчитан на сборку из корня репозитория:
 
 ```bash
-docker build -f streamlit/Dockerfile -t room-type-classifier-streamlit .
-docker run --rm -p 8501:8501 room-type-classifier-streamlit
+just docker-build-streamlit
+just docker-run-streamlit
 ```
 
-Пример секции для будущего `docker-compose.yml`:
+Если нужно добавить Streamlit в `docker-compose.yml`, можно использовать такую секцию:
 
 ```yaml
 services:
@@ -51,7 +51,7 @@ models/yolo/downloads/keremberke/yolov8m-scene-classification/best.pt
 Чтобы разрешить автозагрузку YOLO из Hugging Face при старте inference:
 
 ```bash
-STREAMLIT_ALLOW_MODEL_DOWNLOAD=1 uv run streamlit run streamlit/app.py
+STREAMLIT_ALLOW_MODEL_DOWNLOAD=1 just run-streamlit
 ```
 
 Для EfficientNet по умолчанию используются checkpoints:
@@ -63,6 +63,19 @@ models/efficientNet/artifacts/efficientnet_b1_best.pt
 
 Пути можно переопределить через `EFFICIENTNET_B0_CHECKPOINT_PATH` и
 `EFFICIENTNET_B1_CHECKPOINT_PATH`.
+
+Для ResNet по умолчанию используются checkpoints:
+
+```text
+outputs/models/resnet18/resnet18_best.pt
+outputs/models/resnet50/resnet50_best.pt
+```
+
+Для ConvNeXt Nano по умолчанию используется checkpoint:
+
+```text
+outputs/models/convnext_nano/convnext_nano_best.pt
+```
 
 Для ConvNeXt Tiny по умолчанию используется checkpoint:
 

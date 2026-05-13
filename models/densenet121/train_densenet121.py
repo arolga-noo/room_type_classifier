@@ -437,7 +437,7 @@ def main() -> None:
     # промежуточный чекпоинт после этапа 1 (head-only)
     head_checkpoint = args.output_dir / "densenet121_head_best.pt"
     # Финальный чекпоинт за этапы 2 и 3
-    finetune_checkpoint = args.output_dir / f"densenet121_{run_id}_best.pt"
+    finetune_checkpoint = args.output_dir / "densenet121_best.pt"
 
     best_macro_f1 = -1.0
     best_epoch: int | str = 0

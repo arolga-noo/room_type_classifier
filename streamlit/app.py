@@ -43,10 +43,10 @@ EFFICIENTNET_B1_CHECKPOINT_PATH = Path(
         ROOT_DIR / "models" / "efficientNet" / "artifacts" / "efficientnet_b1_best.pt",
     )
 )
-RESNET50_MODEL_PATH = ROOT_DIR / "outputs" / "models" / "best_resnet50_avito.pth"
+RESNET50_MODEL_PATH = ROOT_DIR / "outputs" / "models" / "resnet50" / "resnet50_best.pt"
 RESNET18_MODEL_PATH = ROOT_DIR / "outputs" / "models" / "resnet18" / "resnet18_best.pt"
 DENSENET121_MODEL_PATH = ROOT_DIR / "outputs" / "models" / "densenet121" / "densenet121_best.pt"
-CONVNEXT_NANO_MODEL_PATH = ROOT_DIR / "outputs" / "models" / "best_model_convnext_nano.pth"
+CONVNEXT_NANO_MODEL_PATH = ROOT_DIR / "outputs" / "models" / "convnext_nano" / "convnext_nano_best.pt"
 CONVNEXT_TINY_MODEL_PATH = ROOT_DIR / "outputs" / "models" / "convnext_tiny" / "convnext_tiny_best.pt"
 
 
