@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import random
 import sys
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import torch
 from torch import nn
@@ -23,18 +21,7 @@ from src.dataloaders import create_dataloaders
 from src.device import get_default_device
 from src.labels import load_label_mapping
 from src.metrics import calculate_accuracy, calculate_macro_f1, calculate_per_class_f1
-
-
-def to_project_relative_path(path: Path | str | None) -> str | None:
-    """Возвращает путь относительно корня проекта, если он находится внутри репозитория."""
-    if path is None:
-        return None
-
-    path = Path(path)
-    try:
-        return path.resolve().relative_to(ROOT_DIR).as_posix()
-    except ValueError:
-        return str(path)
+from src.training_helpers import set_seed, to_project_relative_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -83,15 +70,6 @@ def parse_args() -> argparse.Namespace:
         help="Минимальный прирост macro-F1, который считается улучшением.",
     )
     return parser.parse_args()
-
-
-def set_seed(seed: int) -> None:
-    """Фиксирует основные источники случайности для повторяемых экспериментов."""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
 
 
 def validate_paths(args: argparse.Namespace) -> None:
