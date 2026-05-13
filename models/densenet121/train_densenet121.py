@@ -6,8 +6,10 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch
+from sklearn.metrics import classification_report
 from torch import nn
 from torch.nn import functional as F
 
@@ -174,7 +176,7 @@ def validate(
     criterion: nn.Module,
     device: torch.device,
     num_classes: int,
-) -> tuple[float, float, float, list[dict[str, object]]]:
+) -> tuple[float, float, float, list[dict[str, object]], list[int], list[int]]:
     """Проверяет модель на validation и считает F1-метрики
 
     Args:
@@ -226,7 +228,7 @@ def validate(
         else:
             item["accuracy"] = 0.0
         item["loss"] = float(per_class_loss[class_id])
-    return total_loss / len(loader.dataset), accuracy, macro_f1, per_class_f1
+    return total_loss / len(loader.dataset), accuracy, macro_f1, per_class_f1, y_true, y_pred
 
 
 def add_label_names(per_class_f1: list[dict[str, object]]) -> list[dict[str, object]]:
@@ -257,14 +259,30 @@ def save_metrics_report(metrics: dict[str, object], metrics_dir: Path) -> tuple[
     """
     metrics_dir.mkdir(parents=True, exist_ok=True)
     run_id = str(metrics.get("run_id") or datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-    metrics_with_run = {"run_id": run_id, **metrics}
 
     metrics_path = metrics_dir / "densenet121_metrics.json"
     experiments_path = metrics_dir / "densenet121_experiments.json"
+    report_json_path = metrics_dir / "densenet121_classification_report.json"
+    report_txt_path = metrics_dir / "densenet121_classification_report.txt"
+
+    best_epoch_metrics = metrics["best_epoch_metrics"]
+    if "classification_report" in best_epoch_metrics:
+        report_json_path.write_text(
+            json.dumps(best_epoch_metrics["classification_report"], indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    if "classification_report_text" in best_epoch_metrics:
+        report_txt_path.write_text(str(best_epoch_metrics["classification_report_text"]), encoding="utf-8")
+
+    metrics_with_run = {"run_id": run_id, **metrics}
+    metrics_with_run["best_epoch_metrics"] = {
+        key: value
+        for key, value in best_epoch_metrics.items()
+        if key not in {"classification_report", "classification_report_text"}
+    }
     metrics_path.write_text(json.dumps(metrics_with_run, indent=2, ensure_ascii=False), encoding="utf-8")
 
     hyperparameters = metrics["hyperparameters"]
-    best_epoch_metrics = metrics["best_epoch_metrics"]
     experiment = {
         "run_id": run_id,
         "model": metrics["model"],
@@ -291,7 +309,7 @@ def save_metrics_report(metrics: dict[str, object], metrics_dir: Path) -> tuple[
         "weighted_sampling": hyperparameters["weighted_sampling"],
         "early_stopping_patience": hyperparameters["early_stopping_patience"],
         "early_stopping_min_delta": hyperparameters["early_stopping_min_delta"],
-        "metrics_json": str(metrics_path),
+        "metrics_json": to_project_relative_path(metrics_path),
     }
 
     if experiments_path.exists():
@@ -341,10 +359,12 @@ def _run_stage(
         global_epoch = epoch_offset + local_epoch
 
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device)
-        val_loss, accuracy, macro_f1, per_class_f1 = validate(
+        val_loss, accuracy, macro_f1, per_class_f1, y_true, y_pred = validate(
             model, val_loader, criterion, device, num_classes
         )
         per_class_f1 = add_label_names(per_class_f1)
+        label_mapping = load_label_mapping()
+        target_names = [label_mapping.get(i, str(i)) for i in range(num_classes)]
 
         history.append({
             "epoch": f"s{stage_name}_{local_epoch}",
@@ -377,6 +397,21 @@ def _run_stage(
                     }
                     for item in per_class_f1
                 ],
+                "classification_report": classification_report(
+                    y_true,
+                    y_pred,
+                    labels=list(range(num_classes)),
+                    target_names=target_names,
+                    output_dict=True,
+                    zero_division=0,
+                ),
+                "classification_report_text": classification_report(
+                    y_true,
+                    y_pred,
+                    labels=list(range(num_classes)),
+                    target_names=target_names,
+                    zero_division=0,
+                ),
             }
             if save_checkpoint:
                 torch.save(
