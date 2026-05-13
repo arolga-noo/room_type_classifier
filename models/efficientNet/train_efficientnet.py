@@ -25,6 +25,7 @@ from src.dataloaders import create_dataloaders
 from src.device import get_default_device
 from src.labels import load_label_mapping
 from src.metrics import calculate_macro_f1, calculate_per_class_f1
+from src.training_helpers import build_checkpoint, to_project_relative_path
 
 
 MODEL_BUILDERS = {
@@ -264,6 +265,7 @@ def main() -> None:
     device = get_default_device()
     print(f"Using device: {device}")
     label_mapping = load_label_mapping()
+    idx_to_class = {str(class_id): label for class_id, label in label_mapping.items()}
     
     # Готовим общий даталоадер (читает CSV и берёт картинки из папок).
     train_loader, val_loader = create_dataloaders(
@@ -363,16 +365,22 @@ def main() -> None:
             best_per_class_f1 = per_class_f1
             epochs_without_improvement = 0
             torch.save(
-                {
-                    "model_state_dict": model.state_dict(),
-                    "variant": args.variant,
-                    "num_classes": args.num_classes,
-                    "image_size": args.image_size,
-                    "use_weighted_sampling": args.use_weighted_sampling,
-                    "macro_f1": best_macro_f1,
-                    "per_class_f1": best_per_class_f1,
-                    "epoch": best_epoch,
-                },
+                build_checkpoint(
+                    model=model,
+                    model_name="efficientnet",
+                    epoch=best_epoch,
+                    best_metric=best_macro_f1,
+                    optimizer=optimizer,
+                    checkpoint_path=checkpoint_path,
+                    extra={
+                        "variant": args.variant,
+                        "num_classes": args.num_classes,
+                        "image_size": args.image_size,
+                        "use_weighted_sampling": args.use_weighted_sampling,
+                        "per_class_f1": best_per_class_f1,
+                        "idx_to_class": idx_to_class,
+                    },
+                ),
                 checkpoint_path,
             )
         else:
@@ -394,7 +402,7 @@ def main() -> None:
         "best_epoch": best_epoch,
         "best_macro_f1": best_macro_f1,
         "best_per_class_f1": best_per_class_f1,
-        "checkpoint": str(checkpoint_path),
+        "checkpoint": to_project_relative_path(checkpoint_path),
         "history": history,
         "stop_reason": stop_reason,
         "hyperparameters": {
@@ -426,7 +434,7 @@ def main() -> None:
             "num_classes": args.num_classes,
             "best_epoch": best_epoch,
             "best_macro_f1": best_macro_f1,
-            "checkpoint": checkpoint_path,
+            "checkpoint": to_project_relative_path(checkpoint_path),
         },
     )
 

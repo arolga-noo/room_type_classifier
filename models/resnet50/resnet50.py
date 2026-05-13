@@ -1,10 +1,8 @@
 import os
 import copy
-import random
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from PIL import Image
 
@@ -26,6 +24,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.dataloaders import create_dataloaders
 from src.metrics import calculate_macro_f1
 from src.device import get_default_device
+from src.training_helpers import build_checkpoint, set_seed
 
 # настройки
 # - пути к данным
@@ -50,14 +49,6 @@ MODEL_SAVE_PATH = PROJECT_ROOT/Path("./outputs/models/best_resnet50_avito.pth").
 
 DEVICE = get_default_device()
 print(DEVICE)
-
-
-# Нужно для воспроизводимости разбиения и обучения.
-def set_seed(seed=42):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
 
 
 # загрузка и разбиение
@@ -196,7 +187,7 @@ def evaluate_and_print_report(model, loader, criterion, device, classes):
 
 # Лучшую модель сохраняем по val_f1_macro, а не по accuracy.
 # Это часто лучше для многоклассовой задачи.
-def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler, device, num_epochs):
+def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler, device, num_epochs, classes):
     best_model_wts = copy.deepcopy(model.state_dict())
     best_val_f1 = -1.0
 
@@ -218,7 +209,22 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
         if val_f1_macro > best_val_f1:
             best_val_f1 = val_f1_macro
             best_model_wts = copy.deepcopy(model.state_dict())
-            torch.save(model.state_dict(), MODEL_SAVE_PATH)
+            torch.save(
+                build_checkpoint(
+                    model=model,
+                    model_name="resnet50",
+                    epoch=epoch + 1,
+                    best_metric=best_val_f1,
+                    optimizer=optimizer,
+                    checkpoint_path=MODEL_SAVE_PATH,
+                    extra={
+                        "num_classes": len(classes),
+                        "image_size": 224,
+                        "idx_to_class": {str(i): class_name for i, class_name in enumerate(classes)},
+                    },
+                ),
+                MODEL_SAVE_PATH,
+            )
             print(f'Best model saved to: {MODEL_SAVE_PATH}')
 
     model.load_state_dict(best_model_wts)
@@ -265,7 +271,8 @@ def main():
         optimizer=optimizer,
         scheduler=scheduler,
         device=DEVICE,
-        num_epochs=NUM_EPOCHS
+        num_epochs=NUM_EPOCHS,
+        classes=classes,
     )
 
     print('Training finished.')

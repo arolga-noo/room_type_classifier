@@ -28,6 +28,7 @@ from src.dataloaders import create_dataloaders
 from src.device import get_default_device
 from src.labels import load_label_mapping
 from src.metrics import calculate_accuracy, calculate_macro_f1, calculate_per_class_f1
+from src.training_helpers import build_checkpoint, to_project_relative_path
 
 _CONFIG_DIR = Path(__file__).resolve().parent
 _DEFAULT_CONFIG = _CONFIG_DIR / "train_config.json"
@@ -255,8 +256,14 @@ def _build_ckpt_payload(
     no_improve: int,
 ) -> dict[str, Any]:
     out: dict[str, Any] = {
-        "model_state_dict": model.state_dict(),
-        "optimizer_state_dict": opt.state_dict(),
+        **build_checkpoint(
+            model=model,
+            model_name=str(meta.get("model_name", "convnext_tiny")),
+            epoch=completed_epoch,
+            best_metric=best_f1 if math.isfinite(best_f1) else macro_f1,
+            optimizer=opt,
+            checkpoint_path=meta.get("checkpoint_path"),
+        ),
         "scaler_state_dict": scaler.state_dict() if scaler.is_enabled() else None,
         "completed_epoch": completed_epoch,
         "macro_f1": float(macro_f1),
@@ -505,7 +512,9 @@ def main() -> None:
         "num_classes": num_classes,
         "image_size": image_size,
         "excluded_original_class_id": excluded,
-        "config_path": str(args.config.resolve()),
+        "config_path": to_project_relative_path(args.config),
+        "model_name": model_name,
+        "idx_to_class": {str(class_id): label for class_id, label in load_label_mapping().items()},
     }
 
     start_ep = 1
@@ -592,7 +601,7 @@ def main() -> None:
                     model,
                     opt,
                     scaler,
-                    meta=ckpt_meta,
+                    meta={**ckpt_meta, "checkpoint_path": best_path},
                     completed_epoch=ep,
                     macro_f1=macro,
                     run_id=run_id,
@@ -611,7 +620,7 @@ def main() -> None:
                     model,
                     opt,
                     scaler,
-                    meta=ckpt_meta,
+                    meta={**ckpt_meta, "checkpoint_path": last_path},
                     completed_epoch=ep,
                     macro_f1=macro,
                     run_id=run_id,
@@ -636,8 +645,8 @@ def main() -> None:
 
     hp = {
         "model_name": model_name,
-        "config": str(args.config.resolve()),
-        "metrics_dir": str(met_dir),
+        "config": to_project_relative_path(args.config),
+        "metrics_dir": to_project_relative_path(met_dir),
         "epochs": epochs,
         "batch_size": batch_size,
         "image_size": image_size,
@@ -656,7 +665,7 @@ def main() -> None:
         "pin_memory": pin_b,
         "persistent_workers": pers_b,
         "exclude_class_id": excluded,
-        "resume_from": str(resume_path.resolve()) if resume_path else None,
+        "resume_from": to_project_relative_path(resume_path),
         "require_cuda": _bool(cfg.get("require_cuda"), False),
     }
     metrics = {
@@ -666,8 +675,8 @@ def main() -> None:
         "best_epoch": best_ep,
         "best_macro_f1": float(best_f1) if math.isfinite(best_f1) else None,
         "best_epoch_metrics": best_metrics,
-        "checkpoint": None if not save_ckpt else str(best_path),
-        "last_checkpoint": None if not save_ckpt or not save_last else str(last_path),
+        "checkpoint": None if not save_ckpt else to_project_relative_path(best_path),
+        "last_checkpoint": None if not save_ckpt or not save_last else to_project_relative_path(last_path),
         "stop_reason": stop,
     }
     mp, ep = save_metrics_report(metrics, met_dir, model_name)

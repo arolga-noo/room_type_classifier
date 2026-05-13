@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import random
 import sys
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import torch
 from torch import nn
@@ -22,6 +20,7 @@ from src.dataloaders import create_dataloaders
 from src.device import get_default_device
 from src.labels import load_label_mapping
 from src.metrics import calculate_accuracy, calculate_macro_f1, calculate_per_class_f1
+from src.training_helpers import build_checkpoint, set_seed, to_project_relative_path
 
 
 
@@ -87,15 +86,6 @@ def parse_args() -> argparse.Namespace:
         help="Минимальный прирост macro-F1, который считается улучшением.",
     )
     return parser.parse_args()
-
-
-def set_seed(seed: int) -> None:
-    """Фиксирует основные источники случайности для повторяемых экспериментов."""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
 
 
 def validate_paths(args: argparse.Namespace) -> None:
@@ -331,6 +321,7 @@ def _run_stage(
     best_epoch_metrics: dict[str, object],
     early_stopping_patience: int,
     early_stopping_min_delta: float,
+    idx_to_class: dict[str, str],
     epoch_offset: int = 0,
 ) -> tuple[float, int | str, dict[str, object], str, list[dict]]:
     """Запускает один этап обучения (произвольное число эпох, фиксированный оптимизатор)
@@ -389,12 +380,19 @@ def _run_stage(
             }
             if save_checkpoint:
                 torch.save(
-                    {
-                        "model_state_dict": model.state_dict(),
-                        "num_classes": num_classes,
-                        "epoch": best_epoch,
-                        "macro_f1": best_macro_f1,
-                    },
+                    build_checkpoint(
+                        model=model,
+                        model_name="densenet121",
+                        epoch=global_epoch,
+                        best_metric=best_macro_f1,
+                        optimizer=optimizer,
+                        checkpoint_path=checkpoint_path,
+                        extra={
+                            "num_classes": num_classes,
+                            "stage_epoch": best_epoch,
+                            "idx_to_class": idx_to_class,
+                        },
+                    ),
                     checkpoint_path,
                 )
         else:
@@ -468,6 +466,7 @@ def main() -> None:
     best_epoch: int | str = 0
     best_epoch_metrics: dict[str, object] = {}
     full_history: list[dict] = []
+    idx_to_class = {str(class_id): label for class_id, label in load_label_mapping().items()}
     stop_reason = "max_epochs"
 
     # ------------------------------------------------------------------
@@ -500,6 +499,7 @@ def main() -> None:
         best_epoch_metrics=best_epoch_metrics,
         early_stopping_patience=0,  # этап 1 всегда проходит полностью
         early_stopping_min_delta=args.early_stopping_min_delta,
+        idx_to_class=idx_to_class,
         epoch_offset=0,
     )
     full_history.extend(history_s1)
@@ -537,6 +537,7 @@ def main() -> None:
         best_epoch_metrics=best_epoch_metrics,
         early_stopping_patience=args.early_stopping_patience,
         early_stopping_min_delta=args.early_stopping_min_delta,
+        idx_to_class=idx_to_class,
         epoch_offset=args.epochs_stage1,
     )
     full_history.extend(history_s2)
@@ -572,6 +573,7 @@ def main() -> None:
         best_epoch_metrics=best_epoch_metrics,
         early_stopping_patience=args.early_stopping_patience,
         early_stopping_min_delta=args.early_stopping_min_delta,
+        idx_to_class=idx_to_class,
         epoch_offset=args.epochs_stage1 + args.epochs_stage2,
     )
     full_history.extend(history_s3)
@@ -608,7 +610,7 @@ def main() -> None:
         "best_macro_f1": best_macro_f1,
         "best_epoch_metrics": best_epoch_metrics,
         "history": full_history,
-        "checkpoint": None if args.no_save_checkpoint else str(finetune_checkpoint),
+        "checkpoint": None if args.no_save_checkpoint else to_project_relative_path(finetune_checkpoint),
         "stop_reason": stop_reason,
     }
 

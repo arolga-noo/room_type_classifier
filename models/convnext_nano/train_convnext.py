@@ -15,6 +15,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.device import get_default_device 
 from src.dataloaders import create_dataloaders
+from src.labels import load_label_mapping
+from src.training_helpers import build_checkpoint, to_project_relative_path
 
 def main():
     parser = argparse.ArgumentParser()
@@ -62,6 +64,7 @@ def main():
     print(f"Начало обучения на {EPOCHS} эпох...")
     
     best_macro_f1 = 0.0
+    idx_to_class = {str(class_id): label for class_id, label in load_label_mapping().items()}
 
     for epoch in range(EPOCHS):
         model.train()
@@ -107,14 +110,31 @@ def main():
 
         if macro_f1 > best_macro_f1:
             best_macro_f1 = macro_f1
-            torch.save(model.state_dict(), save_dir / "best_model_ConvNeXt_Nano.pth")
+            checkpoint_path = save_dir / "best_model_ConvNeXt_Nano.pth"
+            torch.save(
+                build_checkpoint(
+                    model=model,
+                    model_name="convnext_nano",
+                    epoch=epoch + 1,
+                    best_metric=best_macro_f1,
+                    optimizer=optimizer,
+                    checkpoint_path=checkpoint_path,
+                    extra={
+                        "num_classes": 19,
+                        "image_size": 224,
+                        "idx_to_class": idx_to_class,
+                    },
+                ),
+                checkpoint_path,
+            )
             
             metrics = {
                 "epoch": int(epoch + 1),
                 "train_loss": float(epoch_train_loss),
                 "val_loss": float(epoch_val_loss),
                 "accuracy": float(val_acc),
-                "macro_f1": float(macro_f1)
+                "macro_f1": float(macro_f1),
+                "checkpoint": to_project_relative_path(checkpoint_path),
             }
             
             with open(save_dir / "best_metrics_convnext.json", "w", encoding="utf-8") as f:

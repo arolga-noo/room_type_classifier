@@ -21,7 +21,7 @@ from src.dataloaders import create_dataloaders
 from src.device import get_default_device
 from src.labels import load_label_mapping
 from src.metrics import calculate_accuracy, calculate_macro_f1, calculate_per_class_f1
-from src.training_helpers import set_seed, to_project_relative_path
+from src.training_helpers import build_checkpoint, set_seed, to_project_relative_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -336,6 +336,7 @@ def main() -> None:
     best_epoch_metrics: dict[str, object] = {}
     checkpoint_path = args.output_dir / "resnet18_best.pt"
     checkpoint_json_path = to_project_relative_path(checkpoint_path)
+    idx_to_class = {str(class_id): label for class_id, label in load_label_mapping().items()}
     epochs_without_improvement = 0
     stop_reason = "max_epochs"
 
@@ -377,13 +378,19 @@ def main() -> None:
             }
             if not args.no_save_checkpoint:
                 torch.save(
-                    {
-                        "model_state_dict": model.state_dict(),
-                        "num_classes": args.num_classes,
-                        "image_size": args.image_size,
-                        "epoch": best_epoch,
-                        "macro_f1": best_macro_f1,
-                    },
+                    build_checkpoint(
+                        model=model,
+                        model_name="resnet18",
+                        epoch=best_epoch,
+                        best_metric=best_macro_f1,
+                        optimizer=optimizer,
+                        checkpoint_path=checkpoint_path,
+                        extra={
+                            "num_classes": args.num_classes,
+                            "image_size": args.image_size,
+                            "idx_to_class": idx_to_class,
+                        },
+                    ),
                     checkpoint_path,
                 )
         else:

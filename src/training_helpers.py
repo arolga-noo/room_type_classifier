@@ -74,6 +74,7 @@ def build_checkpoint(
     best_metric: float,
     metric_name: str = "macro_f1",
     optimizer: torch.optim.Optimizer | None = None,
+    checkpoint_path: Path | str | None = None,
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Собирает базовый checkpoint в одном формате для train-скриптов."""
@@ -84,6 +85,11 @@ def build_checkpoint(
         "best_metric": float(best_metric),
         "metric_name": metric_name,
     }
+    if checkpoint_path is not None:
+        checkpoint["checkpoint_path"] = to_project_relative_path(checkpoint_path)
+    if metric_name == "macro_f1":
+        checkpoint["macro_f1"] = float(best_metric)
+        checkpoint["best_macro_f1"] = float(best_metric)
     if optimizer is not None:
         checkpoint["optimizer_state_dict"] = optimizer.state_dict()
     if extra:
