@@ -9,6 +9,7 @@ import torch
 from huggingface_hub import hf_hub_download
 from ultralyticsplus import YOLO, postprocess_classify_output
 
+from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, log_mlflow_params, start_mlflow_run
 from src.training_helpers import resolve_project_path, save_json, to_project_relative_path
 
 
@@ -166,6 +167,20 @@ def main() -> int:
     if checkpoint_path is None or output_dir is None or metrics_dir is None or project_checkpoint is None:
         raise ValueError("paths are not configured")
 
+    # Для YOLO логируем inference-run, а не обучение модели
+    start_mlflow_run(
+        "yolo",
+        "yolo_inference",
+        {
+            "model": "yolo",
+            "model_name": "yolov8m-scene-classification",
+            "metric_name": "avg_top1_confidence",
+            "images_dir": to_project_relative_path(images_dir),
+            "max_images": args.max_images,
+            "confidence": args.confidence,
+        },
+    )
+
     start = time.perf_counter()
     checkpoint_path = download_checkpoint(checkpoint_path)
     model = YOLO(checkpoint_path)
@@ -201,6 +216,24 @@ def main() -> int:
         predict_time=predict_time,
         confidence=args.confidence,
     )
+    log_mlflow_metrics(
+        {
+            "best_metric": avg_confidence,
+            "avg_top1_confidence": avg_confidence,
+            "num_images": len(predictions),
+            "load_time_sec": load_time,
+            "predict_time_sec": predict_time,
+        }
+    )
+    log_mlflow_params(
+        {
+            "best_epoch": 0,
+            "checkpoint": to_project_relative_path(project_checkpoint),
+            "metrics_json": to_project_relative_path(metrics_path),
+        }
+    )
+    log_mlflow_artifacts([metrics_path, log_path, project_checkpoint])
+    end_mlflow_run()
 
     print(f"YOLO checkpoint: {to_project_relative_path(checkpoint_path)}")
     print(f"Изображений: {len(image_paths)}")

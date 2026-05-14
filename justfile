@@ -113,7 +113,7 @@ pytorch-cu130:
 
 # Запустить YOLO demo/inference
 run-yolo:
-    uv run --group yolo python -m models.yolo.main_yolo
+    uv run --group yolo --group tracking python -m models.yolo.main_yolo
 
 # Локальное обучение
 

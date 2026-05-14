@@ -16,12 +16,15 @@ KNOWN_MODELS = {
     "efficientnet",
     "convnext_nano",
     "convnext_tiny",
+    "yolo",
 }
 
 FIELDNAMES = [
     "model",
     "variant",
     "run_name",
+    "metric_name",
+    "best_metric",
     "best_macro_f1",
     "best_accuracy",
     "best_val_loss",
@@ -104,6 +107,8 @@ def _row_from_run(run: Any) -> dict[str, str]:
         "model": model,
         "variant": _param(run, "variant"),
         "run_name": run.data.tags.get("mlflow.runName", ""),
+        "metric_name": _param(run, "metric_name") or "macro_f1",
+        "best_metric": _format_metric(_metric(run, "best_metric", "best_macro_f1", "macro_f1")),
         "best_macro_f1": _format_metric(_metric(run, "best_macro_f1", "macro_f1")),
         "best_accuracy": _format_metric(_metric(run, "best_accuracy", "accuracy")),
         "best_val_loss": _format_metric(_metric(run, "best_val_loss", "val_loss")),
@@ -115,7 +120,7 @@ def _row_from_run(run: Any) -> dict[str, str]:
 
 def _sort_key(row: dict[str, str]) -> tuple[float, str]:
     """Сортирует строки по главной метрике"""
-    value = _as_float(row["best_macro_f1"])
+    value = _as_float(row["best_macro_f1"]) or _as_float(row["best_metric"])
     return (value if value is not None else -1.0, row["model"])
 
 

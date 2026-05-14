@@ -338,6 +338,16 @@ best_macro_f1
 just run-yolo
 ```
 
+YOLO тоже попадает в MLflow, но у него другая метрика:
+
+```text
+avg_top1_confidence
+```
+
+Ее нельзя напрямую сравнивать с `best_macro_f1` обученных классификаторов,
+поэтому в итоговой таблице для YOLO нужно смотреть поля `metric_name` и
+`best_metric`.
+
 После обучения проверьте метрики и checkpoint-и:
 
 ```bash
