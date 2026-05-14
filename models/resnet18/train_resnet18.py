@@ -21,7 +21,7 @@ from models.resnet18.resnet18 import build_resnet18
 from src.dataloaders import create_dataloaders
 from src.device import get_default_device
 from src.labels import load_label_mapping
-from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, start_mlflow_run
+from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, log_mlflow_params, start_mlflow_run
 from src.metrics import calculate_accuracy, calculate_macro_f1, calculate_per_class_f1
 from src.training_helpers import build_checkpoint, set_seed, to_project_relative_path
 
@@ -423,6 +423,13 @@ def main() -> None:
             "best_epoch": best_epoch,
             "best_accuracy": best_epoch_metrics.get("accuracy"),
             "best_val_loss": best_epoch_metrics.get("val_loss"),
+        }
+    )
+    log_mlflow_params(
+        {
+            "best_epoch": best_epoch,
+            "checkpoint": None if args.no_save_checkpoint else checkpoint_json_path,
+            "metrics_json": to_project_relative_path(metrics_path),
         }
     )
     log_mlflow_artifacts(

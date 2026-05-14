@@ -307,6 +307,31 @@ just train-convnext-nano
 just train-convnext-tiny
 ```
 
+MLflow используется локально, без регистрации и удаленного сервера. После обучения
+можно открыть интерфейс:
+
+```bash
+just mlflow-ui
+```
+
+Таблица сравнения моделей строится из MLflow:
+
+```bash
+just compare-models
+```
+
+Результат сохраняется в:
+
+```text
+reports/model_comparison.csv
+```
+
+Главная метрика для выбора модели:
+
+```text
+best_macro_f1
+```
+
 Для YOLO обучение не запускается: используется внешний pretrained checkpoint. Для проверки inference:
 
 ```bash

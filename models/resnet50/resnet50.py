@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.dataloaders import create_dataloaders
 from src.metrics import calculate_macro_f1
 from src.device import get_default_device
-from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, start_mlflow_run
+from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, log_mlflow_params, start_mlflow_run
 from src.training_helpers import build_checkpoint, save_json, set_seed, to_project_relative_path
 
 
@@ -218,18 +218,6 @@ def train_model(
             f'val_loss: {val_loss:.4f} -- val_acc: {val_acc:.4f} -- '
             f'val_f1_macro: {val_f1_macro:.4f}'
         )
-        log_mlflow_metrics(
-            {
-                "train_loss": train_loss,
-                "train_accuracy": train_acc,
-                "val_loss": val_loss,
-                "accuracy": val_acc,
-                "macro_f1": val_f1_macro,
-                "best_macro_f1": best_val_f1,
-            },
-            step=epoch + 1,
-        )
-
         # Сохраняем лучшую модель по macro F1
         if val_f1_macro > best_val_f1:
             best_val_f1 = val_f1_macro
@@ -260,6 +248,18 @@ def train_model(
                 "accuracy": val_acc,
                 "macro_f1": best_val_f1,
             }
+
+        log_mlflow_metrics(
+            {
+                "train_loss": train_loss,
+                "train_accuracy": train_acc,
+                "val_loss": val_loss,
+                "accuracy": val_acc,
+                "macro_f1": val_f1_macro,
+                "best_macro_f1": best_val_f1,
+            },
+            step=epoch + 1,
+        )
 
     model.load_state_dict(best_model_wts)
     return model, best_val_f1, best_metrics
@@ -350,6 +350,13 @@ def main():
             "best_epoch": best_metrics.get("epoch"),
             "best_accuracy": best_metrics.get("accuracy"),
             "best_val_loss": best_metrics.get("val_loss"),
+        }
+    )
+    log_mlflow_params(
+        {
+            "best_epoch": best_metrics.get("epoch"),
+            "checkpoint": None if args.no_save_checkpoint else to_project_relative_path(args.output_dir / "resnet50_best.pt"),
+            "metrics_json": to_project_relative_path(metrics_path),
         }
     )
     log_mlflow_artifacts(

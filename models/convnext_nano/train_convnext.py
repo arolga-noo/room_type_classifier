@@ -14,7 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.device import get_default_device 
 from src.dataloaders import create_dataloaders
 from src.labels import load_label_mapping
-from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, start_mlflow_run
+from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, log_mlflow_params, start_mlflow_run
 from src.training_helpers import build_checkpoint, save_json, set_seed, to_project_relative_path
 
 
@@ -154,16 +154,6 @@ def main():
 
         print(f"Эпоха {epoch+1}/{args.epochs} | Train Loss: {epoch_train_loss:.4f}")
         print(f"Val Loss: {epoch_val_loss:.4f} | Acc: {val_acc:.2f}% | Macro F1: {macro_f1:.4f}")
-        log_mlflow_metrics(
-            {
-                "train_loss": epoch_train_loss,
-                "val_loss": epoch_val_loss,
-                "accuracy": val_acc / 100,
-                "macro_f1": macro_f1,
-                "best_macro_f1": best_macro_f1,
-            },
-            step=epoch + 1,
-        )
 
         if macro_f1 > best_macro_f1:
             best_macro_f1 = macro_f1
@@ -192,8 +182,8 @@ def main():
                 "train_loss": float(epoch_train_loss),
                 "val_loss": float(epoch_val_loss),
                 "accuracy": float(val_acc / 100),
-                    "macro_f1": float(macro_f1),
-                    "checkpoint": None if args.no_save_checkpoint else to_project_relative_path(checkpoint_path),
+                "macro_f1": float(macro_f1),
+                "checkpoint": None if args.no_save_checkpoint else to_project_relative_path(checkpoint_path),
                 "hyperparameters": {
                     "epochs": args.epochs,
                     "batch_size": args.batch_size,
@@ -209,10 +199,28 @@ def main():
             save_json(metrics, metrics_path)
             print(f"Найдена лучшая модель (F1: {best_macro_f1:.4f})")
 
+        log_mlflow_metrics(
+            {
+                "train_loss": epoch_train_loss,
+                "val_loss": epoch_val_loss,
+                "accuracy": val_acc / 100,
+                "macro_f1": macro_f1,
+                "best_macro_f1": best_macro_f1,
+            },
+            step=epoch + 1,
+        )
+
     log_mlflow_metrics(
         {
             "best_macro_f1": best_macro_f1,
             "best_epoch": best_epoch,
+        }
+    )
+    log_mlflow_params(
+        {
+            "best_epoch": best_epoch,
+            "checkpoint": None if args.no_save_checkpoint else to_project_relative_path(checkpoint_path),
+            "metrics_json": to_project_relative_path(metrics_path),
         }
     )
     log_mlflow_artifacts(

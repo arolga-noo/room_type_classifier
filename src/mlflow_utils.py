@@ -68,6 +68,15 @@ def log_mlflow_metrics(metrics: dict[str, Any], step: int | None = None) -> None
         mlflow.log_metrics(values, step=step)
 
 
+def log_mlflow_params(params: dict[str, Any]) -> None:
+    """Логирует дополнительные параметры после обучения"""
+    mlflow = _load_mlflow()
+    if mlflow is None or mlflow.active_run() is None:
+        return
+
+    mlflow.log_params(flatten_params(params))
+
+
 def log_mlflow_artifacts(paths: list[Path | str | None]) -> None:
     """Логирует файлы с метриками и checkpoint как artifacts"""
     mlflow = _load_mlflow()
@@ -94,7 +103,6 @@ def start_mlflow_run(model_name: str, run_name: str, params: dict[str, Any]) -> 
     client = mlflow.tracking.MlflowClient()
     if client.get_experiment_by_name(EXPERIMENT_NAME) is None:
         client.create_experiment(EXPERIMENT_NAME, artifact_location=ARTIFACTS_DIR.as_uri())
-    mlflow.set_experiment(EXPERIMENT_NAME)
     mlflow.set_experiment(EXPERIMENT_NAME)
 
     run = mlflow.start_run(run_name=run_name)

@@ -24,7 +24,7 @@ if str(ROOT_DIR) not in sys.path:
 from src.dataloaders import create_dataloaders
 from src.device import get_default_device
 from src.labels import load_label_mapping
-from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, start_mlflow_run
+from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, log_mlflow_params, start_mlflow_run
 from src.metrics import calculate_macro_f1, calculate_per_class_f1
 from src.training_helpers import build_checkpoint, to_project_relative_path
 
@@ -380,17 +380,6 @@ def main() -> None:
             f"macro_f1={macro_f1:.4f} "
             f"lr={current_lr:.2e}"
         )
-        log_mlflow_metrics(
-            {
-                "train_loss": train_loss,
-                "val_loss": val_loss,
-                "macro_f1": macro_f1,
-                "learning_rate": current_lr,
-                "best_macro_f1": best_macro_f1,
-            },
-            step=epoch,
-        )
-
         improved = macro_f1 > best_macro_f1 + args.early_stopping_min_delta
         if improved:
             # Если стало лучше, обновляем best
@@ -420,6 +409,17 @@ def main() -> None:
                 )
         else:
             epochs_without_improvement += 1
+
+        log_mlflow_metrics(
+            {
+                "train_loss": train_loss,
+                "val_loss": val_loss,
+                "macro_f1": macro_f1,
+                "learning_rate": current_lr,
+                "best_macro_f1": best_macro_f1,
+            },
+            step=epoch,
+        )
 
         if args.early_stopping_patience > 0 and epochs_without_improvement >= args.early_stopping_patience:
             stop_reason = "early_stopping"
@@ -477,6 +477,13 @@ def main() -> None:
         {
             "best_macro_f1": best_macro_f1,
             "best_epoch": best_epoch,
+        }
+    )
+    log_mlflow_params(
+        {
+            "best_epoch": best_epoch,
+            "checkpoint": None if args.no_save_checkpoint else to_project_relative_path(checkpoint_path),
+            "metrics_json": to_project_relative_path(metrics_path),
         }
     )
     log_mlflow_artifacts(

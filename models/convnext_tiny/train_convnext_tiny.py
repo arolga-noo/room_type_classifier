@@ -27,7 +27,7 @@ from models.convnext_tiny.model import build_convnext_tiny
 from src.dataloaders import create_dataloaders
 from src.device import get_default_device
 from src.labels import load_label_mapping
-from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, start_mlflow_run
+from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, log_mlflow_params, start_mlflow_run
 from src.metrics import calculate_accuracy, calculate_macro_f1, calculate_per_class_f1
 from src.training_helpers import build_checkpoint, to_project_relative_path
 
@@ -720,6 +720,13 @@ def main() -> None:
             "best_epoch": best_ep,
             "best_accuracy": best_metrics.get("accuracy"),
             "best_val_loss": best_metrics.get("val_loss"),
+        }
+    )
+    log_mlflow_params(
+        {
+            "best_epoch": best_ep,
+            "checkpoint": None if not save_ckpt else to_project_relative_path(best_path),
+            "metrics_json": to_project_relative_path(mp),
         }
     )
     log_mlflow_artifacts(

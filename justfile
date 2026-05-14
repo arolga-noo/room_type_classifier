@@ -95,6 +95,10 @@ lock:
 check-training-outputs:
     uv run --group data python -m src.validate_training_outputs --allow-empty-checkpoints
 
+# Построить таблицу сравнения моделей из MLflow
+compare-models:
+    uv run --group tracking python -m src.compare_mlflow_models
+
 # Переустановить torch/torchvision из обычного PyPI
 pytorch-pypi:
     {{PYTORCH_PIP}} install --upgrade --reinstall torch torchvision
