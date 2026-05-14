@@ -117,10 +117,19 @@ run-yolo:
 
 # Локальное обучение
 
-# Обучить EfficientNet
-train-efficientnet EPOCHS="30" BATCH="32":
+# Обучить EfficientNet B0
+train-efficientnet-b0 EPOCHS="30" BATCH="32":
     uv run --group efficientnet --group tracking python -m models.efficientNet.train_efficientnet \
-      --epochs {{EPOCHS}} --batch-size {{BATCH}}
+      --variant b0 --epochs {{EPOCHS}} --batch-size {{BATCH}}
+
+# Обучить EfficientNet B1
+train-efficientnet-b1 EPOCHS="30" BATCH="32":
+    uv run --group efficientnet --group tracking python -m models.efficientNet.train_efficientnet \
+      --variant b1 --epochs {{EPOCHS}} --batch-size {{BATCH}}
+
+# Старое короткое имя для EfficientNet B0
+train-efficientnet EPOCHS="30" BATCH="32":
+    just train-efficientnet-b0 {{EPOCHS}} {{BATCH}}
 
 # Обучить ResNet50
 train-resnet50 EPOCHS="15" BATCH="32":
