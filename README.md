@@ -332,6 +332,9 @@ just docker-build
 just docker-train-resnet18
 ```
 
+Docker-команды сначала пробуют запуститься с CUDA через NVIDIA GPU. Если CUDA
+в контейнере недоступна, запуск автоматически переходит на CPU.
+
 Команды Docker для отдельных моделей:
 
 ```bash

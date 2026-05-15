@@ -208,35 +208,49 @@ docker-run-streamlit:
 
 # Проверить доступность GPU внутри Docker
 docker-check-gpu:
-    docker compose run --rm base python -c "exec('import torch\nprint(\"torch:\", torch.__version__)\nprint(\"CUDA:\", torch.cuda.is_available())\nprint(\"Device:\", torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"CPU\")')"
+    @if docker compose -f docker-compose.yml -f docker-compose.gpu.yml run --rm base python -c "exec('import torch\nprint(\"torch:\", torch.__version__)\nprint(\"CUDA:\", torch.cuda.is_available())\nprint(\"Device:\", torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"CPU\")')" 2>/dev/null; then \
+        true; \
+    else \
+        docker compose run --rm base python -c "exec('import torch\nprint(\"torch:\", torch.__version__)\nprint(\"CUDA:\", torch.cuda.is_available())\nprint(\"Device:\", torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"CPU\")')"; \
+    fi
+
+# Запустить Docker-сервис с GPU, если CUDA доступна внутри контейнера
+_docker-compose-run SERVICE *ARGS:
+    @if docker compose -f docker-compose.yml -f docker-compose.gpu.yml run --rm base python -c "import torch; raise SystemExit(0 if torch.cuda.is_available() else 1)" >/dev/null 2>&1; then \
+        echo "Docker CUDA доступна, запускаем с GPU"; \
+        docker compose -f docker-compose.yml -f docker-compose.gpu.yml run --rm {{ARGS}} {{SERVICE}}; \
+    else \
+        echo "Docker CUDA недоступна, запускаем на CPU"; \
+        docker compose run --rm {{ARGS}} {{SERVICE}}; \
+    fi
 
 # Обучить DenseNet121 в Docker
 docker-train-densenet121 STAGE1="2" STAGE2="8" STAGE3="5" BATCH="32":
-    docker compose run --rm -e STAGE1={{STAGE1}} -e STAGE2={{STAGE2}} -e STAGE3={{STAGE3}} -e BATCH={{BATCH}} train-densenet121
+    just _docker-compose-run train-densenet121 -e STAGE1={{STAGE1}} -e STAGE2={{STAGE2}} -e STAGE3={{STAGE3}} -e BATCH={{BATCH}}
 
 # Обучить ResNet18 в Docker с лучшими параметрами
 docker-train-resnet18 EPOCHS="30" BATCH="32" SEED="42":
-    docker compose run --rm -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}} -e SEED={{SEED}} train-resnet18
+    just _docker-compose-run train-resnet18 -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}} -e SEED={{SEED}}
 
 # Обучить ResNet50 в Docker
 docker-train-resnet50 EPOCHS="15" BATCH="32":
-    docker compose run --rm -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}} train-resnet50
+    just _docker-compose-run train-resnet50 -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}}
 
 # Обучить EfficientNet в Docker
 docker-train-efficientnet EPOCHS="30" BATCH="32":
-    docker compose run --rm -e VARIANT=b0 -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}} train-efficientnet
+    just _docker-compose-run train-efficientnet -e VARIANT=b0 -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}}
 
 # Обучить EfficientNet B0 в Docker
 docker-train-efficientnet-b0 EPOCHS="30" BATCH="32":
-    docker compose run --rm -e VARIANT=b0 -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}} train-efficientnet
+    just _docker-compose-run train-efficientnet -e VARIANT=b0 -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}}
 
 # Обучить EfficientNet B1 в Docker
 docker-train-efficientnet-b1 EPOCHS="30" BATCH="32":
-    docker compose run --rm -e VARIANT=b1 -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}} train-efficientnet
+    just _docker-compose-run train-efficientnet -e VARIANT=b1 -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}}
 
 # Обучить ConvNeXt Nano в Docker
 docker-train-convnext EPOCHS="30" BATCH="32":
-    docker compose run --rm -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}} train-convnext
+    just _docker-compose-run train-convnext -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}}
 
 # Обучить ConvNeXt Nano в Docker
 docker-train-convnext-nano EPOCHS="30" BATCH="32":
@@ -244,11 +258,11 @@ docker-train-convnext-nano EPOCHS="30" BATCH="32":
 
 # Обучить ConvNeXt Tiny в Docker
 docker-train-convnext-tiny CONFIG="models/convnext_tiny/train_config.json":
-    docker compose run --rm -e CONFIG={{CONFIG}} train-convnext-tiny
+    just _docker-compose-run train-convnext-tiny -e CONFIG={{CONFIG}}
 
 # Запустить YOLO в Docker
 docker-run-yolo:
-    docker compose run --rm yolo
+    just _docker-compose-run yolo
 
 # Запустить YOLO в Docker и залогировать inference-run
 docker-train-yolo:

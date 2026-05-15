@@ -1,0 +1,28 @@
+services:
+
+  base:
+    gpus: all
+
+  train-densenet121:
+    gpus: all
+
+  train-resnet18:
+    gpus: all
+
+  train-resnet50:
+    gpus: all
+
+  train-efficientnet:
+    gpus: all
+
+  train-convnext:
+    gpus: all
+
+  train-convnext-tiny:
+    gpus: all
+
+  gradcam:
+    gpus: all
+
+  yolo:
+    gpus: all
