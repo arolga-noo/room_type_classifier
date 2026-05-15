@@ -25,7 +25,7 @@ from src.dataloaders import create_dataloaders
 from src.device import get_default_device
 from src.labels import load_label_mapping
 from src.mlflow_utils import end_mlflow_run, log_mlflow_artifacts, log_mlflow_metrics, log_mlflow_params, start_mlflow_run
-from src.metrics import calculate_macro_f1, calculate_per_class_f1
+from src.metrics import calculate_accuracy, calculate_macro_f1, calculate_per_class_f1
 from src.training_helpers import build_checkpoint, to_project_relative_path
 
 
@@ -183,7 +183,7 @@ def evaluate(
     criterion: nn.Module,
     device: torch.device,
     num_classes: int,
-) -> tuple[float, float, list[dict[str, object]]]:
+) -> tuple[float, float, float, list[dict[str, object]]]:
     model.eval()
     total_loss = 0.0
     y_true: list[int] = []
@@ -202,8 +202,9 @@ def evaluate(
         y_pred.extend(predictions.cpu().tolist())
 
     macro_f1 = calculate_macro_f1(y_true, y_pred)
+    accuracy = calculate_accuracy(y_true, y_pred)
     per_class_f1 = calculate_per_class_f1(y_true, y_pred, num_classes)
-    return total_loss / len(loader.dataset), macro_f1, per_class_f1
+    return total_loss / len(loader.dataset), accuracy, macro_f1, per_class_f1
 
 
 def add_label_names(
@@ -233,7 +234,27 @@ def print_per_class_f1(per_class_f1: list[dict[str, object]]) -> None:
 def save_comparison_row(metrics_path: Path, row: dict[str, object]) -> None:
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
     file_exists = metrics_path.exists()
-    fieldnames = ["model", "variant", "num_classes", "best_epoch", "best_macro_f1", "checkpoint"]
+    fieldnames = [
+        "model",
+        "variant",
+        "num_classes",
+        "best_epoch",
+        "best_macro_f1",
+        "best_accuracy",
+        "best_train_loss",
+        "best_val_loss",
+        "checkpoint",
+    ]
+
+    if file_exists:
+        with metrics_path.open(newline="") as file:
+            reader = csv.DictReader(file)
+            rows = list(reader)
+        if reader.fieldnames != fieldnames:
+            with metrics_path.open("w", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
 
     with metrics_path.open("a", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -309,6 +330,7 @@ def main() -> None:
     best_macro_f1 = -1.0
     best_epoch = 0
     best_per_class_f1: list[dict[str, object]] = []
+    best_epoch_metrics: dict[str, object] = {}
     checkpoint_path = args.output_dir / f"efficientnet_{args.variant}_best.pt"
     history = []
     epochs_without_improvement = 0
@@ -324,7 +346,7 @@ def main() -> None:
             epoch=epoch,
             log_every=args.log_every,
         )
-        val_loss, macro_f1, per_class_f1 = evaluate(
+        val_loss, accuracy, macro_f1, per_class_f1 = evaluate(
             model,
             val_loader,
             criterion,
@@ -341,6 +363,7 @@ def main() -> None:
                 "epoch": epoch,
                 "train_loss": train_loss,
                 "val_loss": val_loss,
+                "accuracy": accuracy,
                 "macro_f1": macro_f1,
                 "per_class_f1": per_class_f1,
                 "lr": current_lr,
@@ -351,6 +374,7 @@ def main() -> None:
             f"epoch={epoch} "
             f"train_loss={train_loss:.4f} "
             f"val_loss={val_loss:.4f} "
+            f"accuracy={accuracy:.4f} "
             f"macro_f1={macro_f1:.4f} "
             f"lr={current_lr:.2e}"
         )
@@ -359,6 +383,13 @@ def main() -> None:
             best_macro_f1 = macro_f1
             best_epoch = epoch
             best_per_class_f1 = per_class_f1
+            best_epoch_metrics = {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "val_loss": val_loss,
+                "accuracy": accuracy,
+                "macro_f1": macro_f1,
+            }
             epochs_without_improvement = 0
             if not args.no_save_checkpoint:
                 torch.save(
@@ -387,6 +418,7 @@ def main() -> None:
             {
                 "train_loss": train_loss,
                 "val_loss": val_loss,
+                "accuracy": accuracy,
                 "macro_f1": macro_f1,
                 "learning_rate": current_lr,
                 "best_macro_f1": best_macro_f1,
@@ -408,6 +440,10 @@ def main() -> None:
         "num_classes": args.num_classes,
         "best_epoch": best_epoch,
         "best_macro_f1": best_macro_f1,
+        "best_accuracy": best_epoch_metrics.get("accuracy"),
+        "best_train_loss": best_epoch_metrics.get("train_loss"),
+        "best_val_loss": best_epoch_metrics.get("val_loss"),
+        "best_epoch_metrics": best_epoch_metrics,
         "best_per_class_f1": best_per_class_f1,
         "checkpoint": None if args.no_save_checkpoint else to_project_relative_path(checkpoint_path),
         "history": history,
@@ -441,6 +477,9 @@ def main() -> None:
             "num_classes": args.num_classes,
             "best_epoch": best_epoch,
             "best_macro_f1": best_macro_f1,
+            "best_accuracy": best_epoch_metrics.get("accuracy"),
+            "best_train_loss": best_epoch_metrics.get("train_loss"),
+            "best_val_loss": best_epoch_metrics.get("val_loss"),
             "checkpoint": None if args.no_save_checkpoint else to_project_relative_path(checkpoint_path),
         },
     )
@@ -448,6 +487,9 @@ def main() -> None:
         {
             "best_macro_f1": best_macro_f1,
             "best_epoch": best_epoch,
+            "best_accuracy": best_epoch_metrics.get("accuracy"),
+            "best_train_loss": best_epoch_metrics.get("train_loss"),
+            "best_val_loss": best_epoch_metrics.get("val_loss"),
         }
     )
     log_mlflow_params(
