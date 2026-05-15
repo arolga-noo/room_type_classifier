@@ -27,7 +27,7 @@ from src.transforms import get_val_transforms
 from models.resnet18.resnet18 import build_resnet18
 
 
-# Пути/настройки моделей. Их можно переопределять через переменные окружения
+# local defaults, env vars can override EfficientNet
 YOLO_MODEL_PATH = ROOT_DIR / "models" / "yolo" / "downloads" / "keremberke" / "yolov8m-scene-classification" / "best.pt"
 YOLO_REPO_ID = "keremberke/yolov8m-scene-classification"
 YOLO_FILENAME = "best.pt"
@@ -52,8 +52,6 @@ CONVNEXT_TINY_MODEL_PATH = ROOT_DIR / "outputs" / "models" / "convnext_tiny" / "
 
 @dataclass(frozen=True)
 class ModelConfig:
-    """Описание одной модели для сайдбара и запуска предсказания."""
-
     key: str
     title: str
     description: str
@@ -62,26 +60,19 @@ class ModelConfig:
 
 
 def load_rgb_image(image_bytes: bytes) -> Image.Image:
-    """Открываем картинку из байтов и приводим к RGB.
-
-    `exif_transpose` нужен, чтобы фото с телефона не было боком.
-    """
+    """Open uploaded image."""
     image = Image.open(io.BytesIO(image_bytes))
     return ImageOps.exif_transpose(image).convert("RGB")
 
 
 @st.cache_data(show_spinner=False)
 def load_room_type_labels() -> dict[int, str]:
-    """Словарь: id класса -> лейбл из csv."""
     return load_label_mapping()
 
 
-@st.cache_resource(show_spinner="Загружаем YOLO модель...") # Кэшируем модель YOLO
+@st.cache_resource(show_spinner="Загружаем YOLO модель...")
 def load_yolo_model() -> object | None:
-    """Загружаем YOLO модель (локально или с HuggingFace, если разрешено).
-    """
     if not YOLO_MODEL_PATH.exists():
-        # Без явного флага мы не скачиваем веса автоматически
         if os.getenv("STREAMLIT_ALLOW_MODEL_DOWNLOAD") != "1":
             return None
 
@@ -91,7 +82,6 @@ def load_yolo_model() -> object | None:
             return None
 
         hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_HUB_TOKEN")
-        # Скачиваем best.pt в папку models/
         hf_hub_download(
             repo_id=YOLO_REPO_ID,
             filename=YOLO_FILENAME,
@@ -105,7 +95,6 @@ def load_yolo_model() -> object | None:
     except ImportError:
         return None
 
-    # Создаём объект модели и выставляем порог уверенности
     model = YOLO(YOLO_MODEL_PATH)
     model.overrides["conf"] = 0.25
     return model
@@ -113,7 +102,6 @@ def load_yolo_model() -> object | None:
 
 @st.cache_data(show_spinner=False)
 def _predict_yolo_cached(image_bytes: bytes) -> tuple[str, float] | None:
-    """Предсказание YOLO с кэшированием (чтобы не считать одинаковое несколько раз)."""
     model = load_yolo_model()
     if model is None:
         return None
@@ -123,17 +111,14 @@ def _predict_yolo_cached(image_bytes: bytes) -> tuple[str, float] | None:
     except ImportError:
         return None
 
-    # YOLO принимает PIL.Image, поэтому сначала декодируем байты
     image = load_rgb_image(image_bytes)
     results = model.predict(image)
     processed_result = postprocess_classify_output(model, result=results[0])
-    # Берём класс с максимальной вероятностью
     prediction, probability = max(processed_result.items(), key=lambda item: item[1])
     return prediction, float(probability)
 
 
 def yolo_predict(image_bytes: bytes) -> tuple[str, float]:
-    """Враппер над кэшированным предсказанием: либо возвращаем результат, либо падаем с ошибкой."""
     prediction = _predict_yolo_cached(image_bytes)
     if prediction is not None:
         return prediction
@@ -141,7 +126,6 @@ def yolo_predict(image_bytes: bytes) -> tuple[str, float]:
 
 
 def build_efficientnet_model(variant: str, num_classes: int) -> object:
-    """Собираем EfficientNet (без предобученных весов) и меняем последний слой под число классов."""
     from torch import nn
     from torchvision.models import efficientnet_b0, efficientnet_b1
 
@@ -156,13 +140,11 @@ def build_efficientnet_model(variant: str, num_classes: int) -> object:
 
 
 def get_default_image_size(variant: str) -> int:
-    """Размер картинки по умолчанию для варианта модели. Если не передано в чекпоинте."""
     return 240 if variant == "b1" else 224
 
 
-@st.cache_resource(show_spinner="Загружаем EfficientNet...") # Кэшируем модель EfficientNet
+@st.cache_resource(show_spinner="Загружаем EfficientNet...")
 def load_efficientnet_model(checkpoint_path: str) -> tuple[object, object, int] | None:
-    """Загружаем EfficientNet из чекпоинта (веса + параметры) и переводим в режим eval()."""
     path = Path(checkpoint_path)
     if not path.exists():
         return None
@@ -172,9 +154,7 @@ def load_efficientnet_model(checkpoint_path: str) -> tuple[object, object, int] 
     except ImportError:
         return None
 
-    # Автовыбор устройства: CUDA -> MPS -> CPU
     device = get_default_device()
-    # Чекпоинт хранит: веса модели и несколько параметров (variant/num_classes/image_size)
     checkpoint = torch.load(path, map_location=device, weights_only=False)
     variant = checkpoint.get("variant", "b0")
     num_classes = int(checkpoint.get("num_classes", 20))
@@ -188,10 +168,6 @@ def load_efficientnet_model(checkpoint_path: str) -> tuple[object, object, int] 
 
 @st.cache_data(show_spinner=False)
 def _predict_efficientnet_cached(image_bytes: bytes, checkpoint_path: str) -> tuple[str, float] | None:
-    """Предсказание EfficientNet с кэшированием.
-
-    Ключ кэша включает путь к чекпоинту, чтобы разные модели не смешивались.
-    """
     loaded_model = load_efficientnet_model(checkpoint_path)
     if loaded_model is None:
         return None
@@ -202,14 +178,11 @@ def _predict_efficientnet_cached(image_bytes: bytes, checkpoint_path: str) -> tu
         return None
 
     model, device, image_size = loaded_model
-    # Трансформации должны совпадать с теми, что были при обучении/валидации
-    # Берем из общего модуля src/transforms.py
     preprocess = get_val_transforms(image_size=image_size)
     image = load_rgb_image(image_bytes)
     tensor = preprocess(image).unsqueeze(0).to(device)
 
     with torch.inference_mode():
-        # Softmax превращает logits в вероятности по классам
         probabilities = torch.softmax(model(tensor), dim=1)[0]
         probability, class_index = torch.max(probabilities, dim=0)
 
@@ -220,7 +193,6 @@ def _predict_efficientnet_cached(image_bytes: bytes, checkpoint_path: str) -> tu
 
 
 def efficientnet_predict(image_bytes: bytes, checkpoint_path: Path) -> tuple[str, float]:
-    """Враппер: либо возвращаем предсказание, либо сообщаем, что чекпоинт недоступен."""
     prediction = _predict_efficientnet_cached(image_bytes, str(checkpoint_path))
     if prediction is not None:
         return prediction
@@ -267,10 +239,6 @@ def load_resnet50_model(checkpoint_path: str) -> tuple[object, object, int] | No
 
 @st.cache_data(show_spinner=False)
 def _predict_resnet50_cached(image_bytes: bytes, checkpoint_path: str) -> tuple[str, float] | None:
-    """Предсказание resnet50 с кэшированием.
-
-    Ключ кэша включает путь к чекпоинту, чтобы разные модели не смешивались.
-    """
     loaded_model = load_resnet50_model(checkpoint_path)
     if loaded_model is None:
         return None
@@ -281,14 +249,11 @@ def _predict_resnet50_cached(image_bytes: bytes, checkpoint_path: str) -> tuple[
         return None
 
     model, device, image_size = loaded_model
-    # Трансформации должны совпадать с теми, что были при обучении/валидации
-    # Берем из общего модуля src/transforms.py
     preprocess = get_val_transforms(image_size=image_size)
     image = load_rgb_image(image_bytes)
     tensor = preprocess(image).unsqueeze(0).to(device)
 
     with torch.inference_mode():
-        # Softmax превращает logits в вероятности по классам
         probabilities = torch.softmax(model(tensor), dim=1)[0]
         probability, class_index = torch.max(probabilities, dim=0)
 
@@ -299,7 +264,6 @@ def _predict_resnet50_cached(image_bytes: bytes, checkpoint_path: str) -> tuple[
 
 
 def resnet50_predict(image_bytes: bytes, checkpoint_path: Path) -> tuple[str, float]:
-    """Враппер: либо возвращаем предсказание, либо сообщаем, что чекпоинт недоступен."""
     prediction = _predict_resnet50_cached(image_bytes, str(checkpoint_path))
     if prediction is not None:
         return prediction
@@ -337,10 +301,6 @@ def load_resnet18_model(checkpoint_path: str) -> tuple[object, object, int] | No
 
 @st.cache_data(show_spinner=False)
 def _predict_resnet18_cached(image_bytes: bytes, checkpoint_path: str) -> tuple[str, float] | None:
-    """Предсказание resnet18 с кэшированием.
-
-    Ключ кэша включает путь к чекпоинту, чтобы разные модели не смешивались.
-    """
     loaded_model = load_resnet18_model(checkpoint_path)
     if loaded_model is None:
         return None
@@ -351,14 +311,11 @@ def _predict_resnet18_cached(image_bytes: bytes, checkpoint_path: str) -> tuple[
         return None
 
     model, device, image_size = loaded_model
-    # Трансформации должны совпадать с теми, что были при обучении/валидации
-    # Берем из общего модуля src/transforms.py
     preprocess = get_val_transforms(image_size=image_size)
     image = load_rgb_image(image_bytes)
     tensor = preprocess(image).unsqueeze(0).to(device)
 
     with torch.inference_mode():
-        # Softmax превращает logits в вероятности по классам
         probabilities = torch.softmax(model(tensor), dim=1)[0]
         probability, class_index = torch.max(probabilities, dim=0)
 
@@ -368,7 +325,6 @@ def _predict_resnet18_cached(image_bytes: bytes, checkpoint_path: str) -> tuple[
     return prediction, float(probability.item())
 
 def resnet18_predict(image_bytes: bytes, checkpoint_path: Path) -> tuple[str, float]:
-    """Враппер: либо возвращаем предсказание, либо сообщаем, что чекпоинт недоступен."""
     prediction = _predict_resnet18_cached(image_bytes, str(checkpoint_path))
     if prediction is not None:
         return prediction
@@ -377,7 +333,6 @@ def resnet18_predict(image_bytes: bytes, checkpoint_path: Path) -> tuple[str, fl
 
 @st.cache_resource(show_spinner="Загружаем DenseNet121...")
 def load_densenet121_model(checkpoint_path: str) -> tuple[object, object, int] | None:
-    """Загружаем DenseNet121 из checkpoint"""
     path = Path(checkpoint_path)
     if not path.exists():
         return None
@@ -405,7 +360,6 @@ def load_densenet121_model(checkpoint_path: str) -> tuple[object, object, int] |
 
 @st.cache_data(show_spinner=False)
 def _predict_densenet121_cached(image_bytes: bytes, checkpoint_path: str) -> tuple[str, float] | None:
-    """Предсказание DenseNet121 с кэшированием"""
     loaded_model = load_densenet121_model(checkpoint_path)
     if loaded_model is None:
         return None
@@ -431,7 +385,6 @@ def _predict_densenet121_cached(image_bytes: bytes, checkpoint_path: str) -> tup
 
 
 def densenet121_predict(image_bytes: bytes, checkpoint_path: Path) -> tuple[str, float]:
-    """Враппер для DenseNet121"""
     prediction = _predict_densenet121_cached(image_bytes, str(checkpoint_path))
     if prediction is not None:
         return prediction
@@ -439,7 +392,6 @@ def densenet121_predict(image_bytes: bytes, checkpoint_path: Path) -> tuple[str,
 
 
 def num_classes_convnext_nano(state_dict: dict) -> int:
-    """Число классов из весов головы timm ConvNeXt (plain state_dict без метаданных)."""
     if "head.fc.weight" in state_dict:
         return int(state_dict["head.fc.weight"].shape[0])
     for key in ("head.weight", "classifier.weight"):
@@ -489,10 +441,6 @@ def load_convnext_nano_model(checkpoint_path: str) -> tuple[object, object, int]
 
 @st.cache_data(show_spinner=False)
 def _predict_convnext_nano_cached(image_bytes: bytes, checkpoint_path: str) -> tuple[str, float] | None:
-    """Предсказание convnext nano с кэшированием.
-
-    Ключ кэша включает путь к чекпоинту, чтобы разные модели не смешивались.
-    """
     loaded_model = load_convnext_nano_model(checkpoint_path)
     if loaded_model is None:
         return None
@@ -503,14 +451,11 @@ def _predict_convnext_nano_cached(image_bytes: bytes, checkpoint_path: str) -> t
         return None
 
     model, device, image_size = loaded_model
-    # Трансформации должны совпадать с теми, что были при обучении/валидации
-    # Берем из общего модуля src/transforms.py
     preprocess = get_val_transforms(image_size=image_size)
     image = load_rgb_image(image_bytes)
     tensor = preprocess(image).unsqueeze(0).to(device)
 
     with torch.inference_mode():
-        # Softmax превращает logits в вероятности по классам
         probabilities = torch.softmax(model(tensor), dim=1)[0]
         probability, class_index = torch.max(probabilities, dim=0)
 
@@ -520,7 +465,6 @@ def _predict_convnext_nano_cached(image_bytes: bytes, checkpoint_path: str) -> t
     return prediction, float(probability.item())
 
 def convnext_nano_predict(image_bytes: bytes, checkpoint_path: Path) -> tuple[str, float]:
-    """Враппер: либо возвращаем предсказание, либо сообщаем, что чекпоинт недоступен."""
     prediction = _predict_convnext_nano_cached(image_bytes, str(checkpoint_path))
     if prediction is not None:
         return prediction
@@ -529,7 +473,6 @@ def convnext_nano_predict(image_bytes: bytes, checkpoint_path: Path) -> tuple[st
 
 @st.cache_resource(show_spinner="Загружаем convnext tiny...")
 def load_convnext_tiny_model(checkpoint_path: str) -> tuple[object, object, int] | None:
-    """Загружаем ConvNeXt Tiny из checkpoint"""
     path = Path(checkpoint_path)
     if not path.exists():
         return None
@@ -557,7 +500,6 @@ def load_convnext_tiny_model(checkpoint_path: str) -> tuple[object, object, int]
 
 @st.cache_data(show_spinner=False)
 def _predict_convnext_tiny_cached(image_bytes: bytes, checkpoint_path: str) -> tuple[str, float] | None:
-    """Предсказание convnext tiny с кэшированием"""
     loaded_model = load_convnext_tiny_model(checkpoint_path)
     if loaded_model is None:
         return None
@@ -583,7 +525,6 @@ def _predict_convnext_tiny_cached(image_bytes: bytes, checkpoint_path: str) -> t
 
 
 def convnext_tiny_predict(image_bytes: bytes, checkpoint_path: Path) -> tuple[str, float]:
-    """Враппер для ConvNeXt Tiny"""
     prediction = _predict_convnext_tiny_cached(image_bytes, str(checkpoint_path))
     if prediction is not None:
         return prediction
@@ -591,7 +532,6 @@ def convnext_tiny_predict(image_bytes: bytes, checkpoint_path: Path) -> tuple[st
 
 
 MODELS = [
-    # Список моделей, которые можно включать/выключать в сайдбаре
     ModelConfig(
         key="yolo_scene_classifier",
         title="YOLO scene classifier",
@@ -652,7 +592,6 @@ MODELS = [
 
 
 def configure_page() -> None:
-    """Базовые настройки страницы Streamlit."""
     st.set_page_config(
         page_title="Room Type Classifier",
         layout="wide",
@@ -660,7 +599,6 @@ def configure_page() -> None:
 
 
 def render_sidebar() -> list[ModelConfig]:
-    """Отображаем сайдбар и возвращаем список выбранных моделей."""
     st.sidebar.header("Модели")
     selected_models = []
     for model in MODELS:
@@ -708,7 +646,6 @@ def render_sidebar() -> list[ModelConfig]:
 
 
 def render_results(uploaded_files: list[st.runtime.uploaded_file_manager.UploadedFile], selected_models: list[ModelConfig]) -> None:
-    """Запускаем распознавание по всем картинкам и отображаем таблицу результатов."""
     rows = []
     progress = st.progress(0, text="Подготавливаем изображения...")
     total_steps = len(uploaded_files) * len(selected_models)
@@ -737,7 +674,6 @@ def render_results(uploaded_files: list[st.runtime.uploaded_file_manager.Uploade
 
     results = pd.DataFrame(rows)
     st.subheader("Результаты")
-    # Таблица с прогресс-баром по вероятности
     st.dataframe(
         results,
         use_container_width=True,
@@ -753,7 +689,6 @@ def render_results(uploaded_files: list[st.runtime.uploaded_file_manager.Uploade
     )
 
     with st.expander("Загруженные изображения", expanded=False):
-        # Показываем превью загруженных картинок в несколько колонок
         columns = st.columns(min(3, len(uploaded_files)))
         for index, uploaded_file in enumerate(uploaded_files):
             with columns[index % len(columns)]:
@@ -761,22 +696,18 @@ def render_results(uploaded_files: list[st.runtime.uploaded_file_manager.Uploade
 
 
 def main() -> None:
-    """Точка входа Streamlit-приложения."""
     configure_page()
 
     st.title("Room Type Classifier")
     st.caption("Загрузка изображений и сравнение результатов выбранных моделей.")
 
-    # Пользователь выбирает модели в сайдбаре
     selected_models = render_sidebar()
-    # Пользователь загружает изображения
     uploaded_files = st.file_uploader(
         "Изображения",
         type=["jpg", "jpeg", "png", "webp"],
         accept_multiple_files=True,
     )
 
-    # Кнопка запуска распознавания
     recognize = st.button(
         "Распознать",
         type="primary",
