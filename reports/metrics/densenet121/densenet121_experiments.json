@@ -136,5 +136,33 @@
     "early_stopping_patience": 3,
     "early_stopping_min_delta": 0.0001,
     "metrics_json": "reports/metrics/densenet121/densenet121_metrics.json"
+  },
+  {
+    "run_id": "2026-05-15_14-54-19",
+    "model": "densenet121",
+    "best_epoch": "s3_1",
+    "best_macro_f1": 0.7220248573712933,
+    "best_accuracy": 0.7253668763102725,
+    "best_train_loss": 0.6937725477062153,
+    "best_val_loss": 1.3709869124854386,
+    "stop_reason": "early_stopping",
+    "checkpoint": "outputs/models/densenet121/densenet121_best.pt",
+    "epochs_stage1": 2,
+    "epochs_stage2": 8,
+    "epochs_stage3": 5,
+    "lr_stage1": 0.001,
+    "lr_stage2": 0.0001,
+    "lr_stage3": 3e-05,
+    "batch_size": 32,
+    "image_size": 224,
+    "weight_decay": 0.0001,
+    "label_smoothing": 0.1,
+    "seed": 42,
+    "pretrained": true,
+    "class_weights": true,
+    "weighted_sampling": true,
+    "early_stopping_patience": 3,
+    "early_stopping_min_delta": 0.0001,
+    "metrics_json": "reports/metrics/densenet121/densenet121_metrics.json"
   }
 ]
