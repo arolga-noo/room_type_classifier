@@ -33,6 +33,7 @@ EFFICIENTNET_B1_CHECKPOINT_PATH = Path(
         ROOT_DIR / "models" / "efficientNet" / "artifacts" / "efficientnet_b1_best.pt",
     )
 )
+PREVIEW_WIDTH_PX = 300
 
 
 @dataclass(frozen=True)
@@ -324,7 +325,12 @@ def render_results(uploaded_files: list[st.runtime.uploaded_file_manager.Uploade
         columns = st.columns(min(3, len(uploaded_files)))
         for index, uploaded_file in enumerate(uploaded_files):
             with columns[index % len(columns)]:
-                st.image(uploaded_file.getvalue(), caption=uploaded_file.name, use_container_width=True)
+                st.image(
+                    uploaded_file.getvalue(), 
+                    caption=uploaded_file.name, 
+                    width=PREVIEW_WIDTH_PX,
+                    #use_container_width=True
+                )
 
 
 def main() -> None:
