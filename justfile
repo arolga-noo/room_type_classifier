@@ -224,7 +224,15 @@ docker-train-resnet50 EPOCHS="30" BATCH="32":
 
 # Обучить EfficientNet в Docker
 docker-train-efficientnet EPOCHS="30" BATCH="32":
-    docker compose run --rm -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}} train-efficientnet
+    docker compose run --rm -e VARIANT=b0 -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}} train-efficientnet
+
+# Обучить EfficientNet B0 в Docker
+docker-train-efficientnet-b0 EPOCHS="30" BATCH="32":
+    docker compose run --rm -e VARIANT=b0 -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}} train-efficientnet
+
+# Обучить EfficientNet B1 в Docker
+docker-train-efficientnet-b1 EPOCHS="30" BATCH="32":
+    docker compose run --rm -e VARIANT=b1 -e EPOCHS={{EPOCHS}} -e BATCH={{BATCH}} train-efficientnet
 
 # Обучить ConvNeXt Nano в Docker
 docker-train-convnext EPOCHS="30" BATCH="32":

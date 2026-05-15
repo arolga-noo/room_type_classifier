@@ -22,6 +22,7 @@ COPY pyproject.toml uv.lock ./
 # Ставим группы, которые нужны docker-compose сервисам
 RUN uv sync \
     --group data \
+    --group tracking \
     --group densenet121 \
     --group efficientnet \
     --group resnet18 \

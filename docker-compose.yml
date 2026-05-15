@@ -7,6 +7,10 @@ services:
       - ./data:/app/data
       - ./outputs:/app/outputs
       - ./reports:/app/reports
+    environment:
+      DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN:-}
+      MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME:-}
+      MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD:-}
     shm_size: "2g"
     deploy:
       resources:
@@ -45,6 +49,7 @@ services:
       service: base
     command: >
       python -m models.efficientNet.train_efficientnet
+      --variant ${VARIANT:-b0}
       --epochs ${EPOCHS:-30} --batch-size ${BATCH:-32}
 
   train-convnext:

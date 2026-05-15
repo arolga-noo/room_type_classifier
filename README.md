@@ -321,6 +321,15 @@ just dagshub-login
 https://dagshub.com/YashinSergey/room_type_classifier/experiments
 ```
 
+Для Docker авторизация через `just dagshub-login` на хосте обычно не попадает
+в контейнер. Поэтому перед Docker-обучением нужно передать DagsHub token:
+
+```bash
+export DAGSHUB_USER_TOKEN=<token>
+just docker-build
+just docker-train-resnet18
+```
+
 Если нужно временно использовать локальный MLflow без DagsHub, можно запустить
 обучение с переменной:
 
