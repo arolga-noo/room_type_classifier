@@ -1,0 +1,20 @@
+{
+  "epoch": 18,
+  "model": "convnext_nano",
+  "train_loss": 1.219358417722914,
+  "val_loss": 1.4176689545313517,
+  "accuracy": 0.7756813417190775,
+  "macro_f1": 0.7598441536699544,
+  "checkpoint": "outputs/models/convnext_nano/convnext_nano_best.pt",
+  "hyperparameters": {
+    "epochs": 25,
+    "batch_size": 32,
+    "image_size": 224,
+    "learning_rate": 2e-05,
+    "weight_decay": 0.1,
+    "seed": 42,
+    "pretrained": true,
+    "weighted_sampling": true,
+    "save_checkpoint": true
+  }
+}
